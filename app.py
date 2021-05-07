@@ -1,27 +1,85 @@
-from flask import Flask, request
+from werkzeug.security import check_password_hash
+from flask import Flask, request, make_response
 from flask_restful import Resource, Api
-from db import get_users, get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, save_department, update_department, get_log_sequence, save_log_sequence
 from flask_cors import CORS
+import datetime
+import jwt
+from functools import wraps
+from db import get_users, get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, save_department, update_department, get_log_sequence, save_log_sequence
 
 
 app = Flask(__name__)
 api = Api(app)
+app.config['SECRET_KEY'] = "mysecretkey"
 CORS(app)
 
-class Users(Resource):
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        if 'x-access-token' in request.headers:
+            token = request.headers['x-access-token']
+        
+        if not token:
+            return {'msg': 'Token is missing'}, 401
+
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'])
+            current_user = get_user(data['username'])
+        except Exception:
+            return {'msg': 'Token is invalid'}, 401
+        
+        return f(current_user, *args, **kwargs)
+    return decorated 
+    
+class Login(Resource):
     def get(self):
+        auth = request.authorization
+
+        if not auth or not auth.username or not auth.password:
+            return make_response(
+                'Could not verify',
+                401,
+                {'WWW-Authenticate': 'Basic realm="Login required!"'})
+        
+        user = get_user(auth.username)
+        if not user:
+            return make_response(
+                'Could not verify',
+                401,
+                {'WWW-Authenticate': 'Basic realm="Login required!"'})
+        
+        if check_password_hash(user['password'], auth.password):
+            token = jwt.encode({
+                'username':user['_id'],
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)},
+                app.config['SECRET_KEY']
+            )
+
+            return {'token': token}
+        
+        return make_response(
+                'Could not verify',
+                401,
+                {'WWW-Authenticate': 'Basic realm="Login required!"'})
+
+class Users(Resource):
+    @token_required
+    def get(self, current_user):
         users = get_users()
         return {'results': users}
 
 class User(Resource):
-    def get (self, username):
+    @token_required
+    def get (self, current_user, username):
         user = get_user(username)
         if user:
             return user, 200
         else:
             return {'msg' : 'User not found'}, 404
 
-    def post(self, username):
+    @token_required
+    def post(self, current_user, username):
         json_data = request.get_json(force=True)
         uName = json_data['username']
         name = json_data['name']
@@ -40,7 +98,8 @@ class User(Resource):
         except Exception:
             return {'msg': 'User can not be created'}, 500
     
-    def put(self, username):
+    @token_required
+    def put(self, current_user, username):
         #Validating the user
         user = get_user(username)
         if not user:
@@ -65,7 +124,8 @@ class User(Resource):
             print(e)
 
 class Departments(Resource):
-    def get(self):
+    @token_required
+    def get(self, current_user):
         try:
             departmentsList = get_departments()
             if departmentsList :
@@ -74,7 +134,8 @@ class Departments(Resource):
         except Exception:
             return {'msg': "Server error"}, 500
     
-    def post(self):
+    @token_required
+    def post(self, current_user):
         json_data = request.get_json(force=True)
         depName = json_data['_id']
         depHOD = json_data['depHOD']
@@ -88,7 +149,8 @@ class Departments(Resource):
         except Exception:
             return {"msg": "Error in saving deparment"}
     
-    def put(self):
+    @token_required
+    def put(self, current_user):
         json_data = request.get_json(force=True)
         depName = json_data['_id']
         depHOD = json_data['depHOD']
@@ -103,11 +165,13 @@ class Departments(Resource):
             return {"msg": "Error in updating department"}
 
 class Documents(Resource):
-    def get(self):
+    @token_required
+    def get(self, current_user):
         documents = get_documents()
         return {'results': documents}
-    
-    def post(self):
+        
+    @token_required
+    def post(self, current_user):
         json_data = request.get_json(force=True)
         docID = json_data['_id']
         title = json_data['title']
@@ -126,7 +190,8 @@ class Documents(Resource):
             return {'msg': 'Server Error'}, 500
 
 class Logs(Resource):
-    def get(self, docID):
+    @token_required
+    def get(self, current_user, docID):
         # json_data = request.get_json(force=True)
         # docID = json_data['docID']
         try:
@@ -142,7 +207,8 @@ class Logs(Resource):
         except Exception:
             return {'msg': 'Server error'}, 500
 
-    def put(self, docID):
+    @token_required
+    def put(self, current_user, docID):
         json_data = request.get_json(force=True)
         docID = json_data['docID']
         forwardedToUname = json_data['forwardedToUname']
@@ -160,6 +226,7 @@ class Logs(Resource):
             return {"msg": "Server Error"}, 500
 
 api.add_resource(Users, '/api/users')
+api.add_resource(Login, '/api/login')
 api.add_resource(User, '/api/user/<username>')
 api.add_resource(Documents, '/api/documents')
 api.add_resource(Logs, '/api/logs/<docID>')
