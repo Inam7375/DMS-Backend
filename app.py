@@ -19,7 +19,7 @@ def token_required(f):
         token = None
         if 'x-access-token' in request.headers:
             token = request.headers['x-access-token']
-        
+
         if not token:
             return {'msg': 'Token is missing'}, 401
 
@@ -33,30 +33,33 @@ def token_required(f):
     return decorated 
     
 class Login(Resource):
-    def get(self):
-        auth = request.authorization
+    def post(self):
+        # auth = request.authorization
+        json_data = request.get_json(force=True)
+        username = json_data['username']
+        password = json_data['password']
 
-        if not auth or not auth.username or not auth.password:
+        if not username or not password:
             return make_response(
-                'Could not verify',
+                'Could not verify 1',
                 401,
                 {'WWW-Authenticate': 'Basic realm="Login required!"'})
         
-        user = get_user(auth.username)
+        user = get_user(username)
         if not user:
             return make_response(
                 'Could not verify',
                 401,
                 {'WWW-Authenticate': 'Basic realm="Login required!"'})
         
-        if check_password_hash(user['password'], auth.password):
+        if check_password_hash(user['password'], password):
             token = jwt.encode({
                 'username':user['_id'],
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)},
                 app.config['SECRET_KEY']
             )
 
-            return {'token': token}
+            return {'token': token.decode('UTF-8')}
         
         return make_response(
                 'Could not verify',
