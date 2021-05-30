@@ -1,3 +1,4 @@
+import json
 from werkzeug.security import check_password_hash
 from flask import Flask, request, make_response
 from flask_restful import Resource, Api
@@ -5,7 +6,7 @@ from flask_cors import CORS
 import datetime
 import jwt
 from functools import wraps
-from db import get_users, get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, save_department, update_department, get_log_sequence, save_log_sequence
+from db import get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, save_department, update_department, get_log_sequence, get_user_created_document, get_user_pending_document, get_users, update_completion, get_user_completed_document, save_user_approved_documents, save_user_notify, get_user_notifications
 
 
 app = Flask(__name__)
@@ -55,11 +56,12 @@ class Login(Resource):
         if check_password_hash(user['password'], password):
             token = jwt.encode({
                 'username':user['_id'],
+                'fullName':user['name'],
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)},
                 app.config['SECRET_KEY']
             )
-
-            return {'token': token.decode('UTF-8')}
+            isAdmin = True if user['role'] == 'Super Admin' else False
+            return {'token': token.decode('UTF-8'), 'isAdmin': isAdmin}
         
         return make_response(
                 'Could not verify',
@@ -67,24 +69,21 @@ class Login(Resource):
                 {'WWW-Authenticate': 'Basic realm="Login required!"'})
 
 class Users(Resource):
-    @token_required
-    def get(self, current_user):
+    def get(self):
         users = get_users()
         return {'results': users}
 
 class User(Resource):
-    @token_required
-    def get (self, current_user, username):
+    def get (self, username):
         user = get_user(username)
         if user:
             return user, 200
         else:
             return {'msg' : 'User not found'}, 404
 
-    @token_required
-    def post(self, current_user, username):
+    def post(self, username):
         json_data = request.get_json(force=True)
-        uName = json_data['username']
+        uName = json_data['_id']
         name = json_data['name']
         email = json_data['email']
         password = json_data['password']
@@ -101,8 +100,7 @@ class User(Resource):
         except Exception:
             return {'msg': 'User can not be created'}, 500
     
-    @token_required
-    def put(self, current_user, username):
+    def put(self, username):
         #Validating the user
         user = get_user(username)
         if not user:
@@ -126,9 +124,31 @@ class User(Resource):
         except Exception as e:
             print(e)
 
+class UserNotifications(Resource):
+    def get(self, uname):
+        notifications = get_user_notifications(uname)
+        if notifications:
+            return {'results': notifications}, 200
+        else:
+            return {'msg': "No notifications found"}, 404
+    
+    def put(self, uname):
+        try:
+            json_data = request.get_json(force=True)
+            docID = json_data['docID']
+            created = False
+            resp = save_user_notify(docID, created)
+            if resp:
+                return {'msg': "Document succesfully saved"}, 200
+            else:
+                return {'msg': "Document was unable to save"}, 500
+        except Exception as e:
+            print(e)
+            return {'msg': "Document was unable to save"}, 500
+
+
 class Departments(Resource):
-    @token_required
-    def get(self, current_user):
+    def get(self):
         try:
             departmentsList = get_departments()
             if departmentsList :
@@ -137,8 +157,7 @@ class Departments(Resource):
         except Exception:
             return {'msg': "Server error"}, 500
     
-    @token_required
-    def post(self, current_user):
+    def post(self):
         json_data = request.get_json(force=True)
         depName = json_data['_id']
         depHOD = json_data['depHOD']
@@ -152,8 +171,7 @@ class Departments(Resource):
         except Exception:
             return {"msg": "Error in saving deparment"}
     
-    @token_required
-    def put(self, current_user):
+    def put(self):
         json_data = request.get_json(force=True)
         depName = json_data['_id']
         depHOD = json_data['depHOD']
@@ -167,24 +185,59 @@ class Departments(Resource):
         except Exception:
             return {"msg": "Error in updating department"}
 
-class Documents(Resource):
-    @token_required
-    def get(self, current_user):
-        documents = get_documents()
+class UserDocuments(Resource):
+    def get(self, uname):
+        documents = get_user_created_document(uname)
+        return {'results': documents}
+
+class UserDocumentsPending(Resource):
+    def get(self, uname):
+        documents = get_user_pending_document(uname)
+        return {'results': documents}
+
+class UserDocumentsApproved(Resource):
+    def put(self, uname):
+        json_data = request.get_json(force=True)
+        docID = json_data['docID']
+        resp = save_user_approved_documents(uname, docID)
+        if resp:
+            return {'msg': 'Approved document saved'}, 200
+        else:
+            return {'msg': 'Internal server error'}
+    
+
+class UserDocumentsCompleted(Resource):
+    def get(self, uname):
+        documents = get_user_completed_document(uname)
         return {'results': documents}
         
-    @token_required
-    def post(self, current_user):
+
+class UpdateDocuments(Resource):
+    def put(self):
         json_data = request.get_json(force=True)
-        docID = json_data['_id']
+        docID = json_data['docID']
+        resp = update_completion(docID)
+        if resp:
+            return {'msg': 'Document Completed'}, 200
+        else:
+            return {'msg': 'Inter Server Error'}, 500
+
+class Documents(Resource):
+    def get(self):
+        documents = get_documents() 
+        return {'results': documents}
+        
+    def post(self):
+        json_data = request.get_json(force=True)
         title = json_data['title']
         frmUser = json_data['created_by_user']
+        frmUname = json_data['created_by_uname']
         frmDep = json_data['created_by_department']
         targetUser = json_data['target_user']
         targetDep = json_data['target_department']
         dsc = json_data['description']
         try:
-            resp = save_document(docID, title, frmUser, frmDep, targetUser, targetDep, dsc)
+            resp = save_document(title, frmUser, frmUname, frmDep, targetUser, targetDep, dsc)
             if resp:
                 return {'msg': 'Document Saved'}, 200
             else:
@@ -193,8 +246,7 @@ class Documents(Resource):
             return {'msg': 'Server Error'}, 500
 
 class Logs(Resource):
-    @token_required
-    def get(self, current_user, docID):
+    def get(self, docID):
         # json_data = request.get_json(force=True)
         # docID = json_data['docID']
         try:
@@ -210,8 +262,7 @@ class Logs(Resource):
         except Exception:
             return {'msg': 'Server error'}, 500
 
-    @token_required
-    def put(self, current_user, docID):
+    def put(self, docID):
         json_data = request.get_json(force=True)
         docID = json_data['docID']
         forwardedToUname = json_data['forwardedToUname']
@@ -231,7 +282,13 @@ class Logs(Resource):
 api.add_resource(Users, '/api/users')
 api.add_resource(Login, '/api/login')
 api.add_resource(User, '/api/user/<username>')
+api.add_resource(UserNotifications, '/api/usernotify/<uname>')
 api.add_resource(Documents, '/api/documents')
+api.add_resource(UpdateDocuments, '/api/updatedocuments')
+api.add_resource(UserDocuments, '/api/userdocuments/<uname>')
+api.add_resource(UserDocumentsCompleted, '/api/usercompleteddocuments/<uname>')
+api.add_resource(UserDocumentsPending, '/api/userpendingdocuments/<uname>')
+api.add_resource(UserDocumentsApproved, '/api/userapproveddocuments/<uname>')
 api.add_resource(Logs, '/api/logs/<docID>')
 api.add_resource(Departments, '/api/departments')
 
