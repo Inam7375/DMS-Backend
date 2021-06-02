@@ -61,7 +61,7 @@ class Login(Resource):
                 app.config['SECRET_KEY']
             )
             isAdmin = True if user['role'] == 'Super Admin' else False
-            return {'token': token.decode('UTF-8'), 'isAdmin': isAdmin}
+            return {'token': token, 'isAdmin': isAdmin}
         
         return make_response(
                 'Could not verify',
