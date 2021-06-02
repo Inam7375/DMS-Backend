@@ -49,7 +49,7 @@ class Login(Resource):
         user = get_user(username)
         if not user:
             return make_response(
-                'Could not verify',
+                'User Not Found',
                 401,
                 {'WWW-Authenticate': 'Basic realm="Login required!"'})
         
