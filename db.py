@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 
 client = MongoClient("mongodb+srv://Inam:inam123@devconnector.acy6n.mongodb.net/myFirstDatabase?retryWrites=true&w=majority")
+# client = MongoClient("mongodb://localhost:27017/fuuast")
 
 database = client.get_database("fuuast")
 user_collection = database.get_collection("users")
