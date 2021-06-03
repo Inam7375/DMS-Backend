@@ -6,13 +6,14 @@ from flask_cors import CORS
 import datetime
 import jwt
 from functools import wraps
-from db import get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, save_department, update_department, get_log_sequence, get_user_created_document, get_user_pending_document, get_users, update_completion, get_user_completed_document, save_user_approved_documents, save_user_notify, get_user_notifications
+from db import get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, del_department, save_department, update_department, get_log_sequence, get_user_created_document, get_user_pending_document, get_users, del_user, update_completion, get_user_completed_document, save_user_approved_documents, save_user_notify, get_user_notifications
 
 
 app = Flask(__name__)
 api = Api(app)
 app.config['SECRET_KEY'] = "mysecretkey"
 CORS(app)
+
 
 def token_required(f):
     @wraps(f)
@@ -29,10 +30,11 @@ def token_required(f):
             current_user = get_user(data['username'])
         except Exception:
             return {'msg': 'Token is invalid'}, 401
-        
+
         return f(current_user, *args, **kwargs)
-    return decorated 
-    
+    return decorated
+
+
 class Login(Resource):
     def post(self):
         # auth = request.authorization
@@ -45,45 +47,47 @@ class Login(Resource):
                 'Could not verify 1',
                 401,
                 {'WWW-Authenticate': 'Basic realm="Login required!"'})
-        
+
         user = get_user(username)
         if not user:
             return make_response(
                 'User Not Found',
                 401,
                 {'WWW-Authenticate': 'Basic realm="Login required!"'})
-        
+
         if check_password_hash(user['password'], password):
             token = jwt.encode({
-                'username':user['_id'],
-                'fullName':user['name'],
+                'username': user['_id'],
+                'fullName': user['name'],
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)},
                 app.config['SECRET_KEY']
             )
             isAdmin = True if user['role'] == 'Super Admin' else False
             return {'token': token, 'isAdmin': isAdmin}
-        
+
         return make_response(
-                'Could not verify',
-                401,
-                {'WWW-Authenticate': 'Basic realm="Login required!"'})
+            'Could not verify',
+            401,
+            {'WWW-Authenticate': 'Basic realm="Login required!"'})
+
 
 class Users(Resource):
     def get(self):
         users = get_users()
         return {'results': users}
 
+
 class User(Resource):
-    def get (self, username):
+    def get(self, username):
         user = get_user(username)
         if user:
             return user, 200
         else:
-            return {'msg' : 'User not found'}, 404
+            return {'msg': 'User not found'}, 404
 
     def post(self, username):
         json_data = request.get_json(force=True)
-        uName = json_data['_id']
+        uName = json_data['un']
         name = json_data['name']
         email = json_data['email']
         password = json_data['password']
@@ -92,16 +96,20 @@ class User(Resource):
         role = json_data['role']
 
         try:
-            resp = save_user(uName, name, email, password, department, designation, role)
+            user = get_user(uName)
+            if user:
+                return {'msg': "User Already Exists"}, 203
+            resp = save_user(uName, name, email, password,
+                             department, designation, role)
             if resp:
-                return { 'msg': "User Created" }, 201
+                return {'msg': "User Created"}, 201
             else:
-                return {'msg': 'Username already exists'}, 422
+                return {'msg': 'User can not be created'}, 422
         except Exception:
-            return {'msg': 'User can not be created'}, 500
-    
+            return {'msg': 'Server Error'}, 500
+
     def put(self, username):
-        #Validating the user
+        # Validating the user
         user = get_user(username)
         if not user:
             return {"msg": "User does not exist"}, 404
@@ -116,13 +124,29 @@ class User(Resource):
         role = json_data['role']
 
         try:
-            resp = update_user(uName, name, email, password, department, designation, role)
+            resp = update_user(uName, name, email, password,
+                               department, designation, role)
             if resp:
-                return { 'msg': "User Updated" }, 201
+                return {'msg': "User Updated"}, 201
             else:
                 return {'msg': 'Server error, try again later'}, 500
         except Exception as e:
             print(e)
+
+    def delete(self, username):
+        try:
+            user = get_user(username)
+            if not user:
+                return {'msg': "User Not Exists"}, 203
+            res = del_user(username)
+            if res:
+                return {'msg': 'User Succesfully Deleted'}, 201
+            else:
+                return {'msg': 'User Cannot be Deleted'}, 203
+
+        except Exception as e:
+            return {'msg': 'Server error, try again later'}, 500
+
 
 class UserNotifications(Resource):
     def get(self, uname):
@@ -131,7 +155,7 @@ class UserNotifications(Resource):
             return {'results': notifications}, 200
         else:
             return {'msg': "No notifications found"}, 404
-    
+
     def put(self, uname):
         try:
             json_data = request.get_json(force=True)
@@ -151,12 +175,12 @@ class Departments(Resource):
     def get(self):
         try:
             departmentsList = get_departments()
-            if departmentsList :
+            if departmentsList:
                 return {'results': departmentsList}, 200
             return {'msg': 'Departments Not Found'}, 405
         except Exception:
             return {'msg': "Server error"}, 500
-    
+
     def post(self):
         json_data = request.get_json(force=True)
         depName = json_data['_id']
@@ -170,7 +194,7 @@ class Departments(Resource):
                 return {"msg": "Department could not be saved"}
         except Exception:
             return {"msg": "Error in saving deparment"}
-    
+
     def put(self):
         json_data = request.get_json(force=True)
         depName = json_data['_id']
@@ -185,15 +209,30 @@ class Departments(Resource):
         except Exception:
             return {"msg": "Error in updating department"}
 
+
+class Department(Resource):
+    def delete(self, id):
+        try:
+            res = del_department(id)
+            if res:
+                return {'msg': 'Department Succesfully  Deleted'}, 200
+            else:
+                return {'msg': 'Department cannot be Deleted'}, 401
+        except Exception as e:
+            return {'msg': 'Server error, try again later'}, 500
+
+
 class UserDocuments(Resource):
     def get(self, uname):
         documents = get_user_created_document(uname)
         return {'results': documents}
 
+
 class UserDocumentsPending(Resource):
     def get(self, uname):
         documents = get_user_pending_document(uname)
         return {'results': documents}
+
 
 class UserDocumentsApproved(Resource):
     def put(self, uname):
@@ -204,13 +243,13 @@ class UserDocumentsApproved(Resource):
             return {'msg': 'Approved document saved'}, 200
         else:
             return {'msg': 'Internal server error'}
-    
+
 
 class UserDocumentsCompleted(Resource):
     def get(self, uname):
         documents = get_user_completed_document(uname)
         return {'results': documents}
-        
+
 
 class UpdateDocuments(Resource):
     def put(self):
@@ -222,11 +261,12 @@ class UpdateDocuments(Resource):
         else:
             return {'msg': 'Inter Server Error'}, 500
 
+
 class Documents(Resource):
     def get(self):
-        documents = get_documents() 
+        documents = get_documents()
         return {'results': documents}
-        
+
     def post(self):
         json_data = request.get_json(force=True)
         title = json_data['title']
@@ -237,13 +277,15 @@ class Documents(Resource):
         targetDep = json_data['target_department']
         dsc = json_data['description']
         try:
-            resp = save_document(title, frmUser, frmUname, frmDep, targetUser, targetDep, dsc)
+            resp = save_document(title, frmUser, frmUname,
+                                 frmDep, targetUser, targetDep, dsc)
             if resp:
                 return {'msg': 'Document Saved'}, 200
             else:
                 return {'msg': 'Server Error'}, 500
         except Exception:
             return {'msg': 'Server Error'}, 500
+
 
 class Logs(Resource):
     def get(self, docID):
@@ -254,7 +296,7 @@ class Logs(Resource):
             sequence = get_log_sequence(docID)
             if log:
                 if sequence:
-                    return {'results': log, 'sequence':sequence}, 200
+                    return {'results': log, 'sequence': sequence}, 200
                 else:
                     return {'results': log}, 200
             else:
@@ -270,14 +312,16 @@ class Logs(Resource):
         objection = json_data['objection']
         comments = json_data['comments']
         date = json_data['date']
-        try :
-            log = save_log(docID, forwardedToUname, forwardedDep, objection, comments, date)
-            if log :
+        try:
+            log = save_log(docID, forwardedToUname,
+                           forwardedDep, objection, comments, date)
+            if log:
                 return {"msg": "Log Updated"}, 200
             else:
                 return {"msg": "Server Error"}, 500
         except Exception:
             return {"msg": "Server Error"}, 500
+
 
 api.add_resource(Users, '/api/users')
 api.add_resource(Login, '/api/login')
@@ -291,6 +335,7 @@ api.add_resource(UserDocumentsPending, '/api/userpendingdocuments/<uname>')
 api.add_resource(UserDocumentsApproved, '/api/userapproveddocuments/<uname>')
 api.add_resource(Logs, '/api/logs/<docID>')
 api.add_resource(Departments, '/api/departments')
+api.add_resource(Department, '/api/department/<id>')
 
-if __name__=='__main__':
+if __name__ == '__main__':
     app.run(debug=True)

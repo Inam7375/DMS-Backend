@@ -5,7 +5,8 @@ from flask import jsonify
 import json
 from datetime import datetime
 
-client = MongoClient("mongodb+srv://Inam:inam123@devconnector.acy6n.mongodb.net/myFirstDatabase?retryWrites=true&w=majority")
+client = MongoClient(
+    "mongodb+srv://Inam:inam123@devconnector.acy6n.mongodb.net/myFirstDatabase?retryWrites=true&w=majority")
 # client = MongoClient("mongodb://localhost:27017/fuuast")
 
 database = client.get_database("fuuast")
@@ -18,24 +19,29 @@ sequence_collection = database.get_collection("sequences")
 doc_sequence_collection = database.get_collection("document_sequence")
 doc_approval_collection = database.get_collection("approved_document_sequence")
 
+
 def myconverter(o):
     if isinstance(o, datetime):
         return o.__str__()
 
+
 def parse_json(data):
     return json.loads(json_util.dumps(data))
+
 
 def get_users():
     users = list(user_collection.find())
     for i in users:
-        i['date_created'] = json.dumps(i['date_created'], default = myconverter)
-    return users 
+        i['date_created'] = json.dumps(i['date_created'], default=myconverter)
+    return users
+
 
 def get_user(uname):
     try:
         user = user_collection.find_one({'_id': uname})
         if user:
-            user['date_created'] = json.dumps(user['date_created'], default = myconverter)
+            user['date_created'] = json.dumps(
+                user['date_created'], default=myconverter)
             return user
         else:
             return False
@@ -55,10 +61,11 @@ def save_user(uname, name, email, password, dpt, desig, role):
             'designation': desig,
             'role': role,
             'date_created': datetime.now()
-            })
+        })
         return True
     except Exception:
         return False
+
 
 def update_user(uname, name, email, password, dpt, desig, role):
     try:
@@ -73,51 +80,61 @@ def update_user(uname, name, email, password, dpt, desig, role):
                 'designation': desig,
                 'role': role,
                 'date_created': datetime.now()
-                }
+            }
             })
         return True
     except Exception as e:
         print(e)
         return False
 
+
+def del_user(uname):
+    try:
+        user_collection.delete_one({'_id': uname})
+        return True
+
+    except Exception:
+        return False
+
+
 def save_user_notify(
     docID,
-    created = False,
+    created=False,
 ):
     try:
         document = doc_collection.find_one({'_id': docID})
         user_notify_collection.find_one_and_update({
             'uname': document['target_user']
-        },{
-            '$push':{
-                'notifications' : {
-                'title': "New document in pending",
-                'docID': docID,
-                'msg': str(docID) + " is pending...",
-                'icon': "AlertOctagonIcon",
-                'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                'category': "success"
+        }, {
+            '$push': {
+                'notifications': {
+                    'title': "New document in pending",
+                    'docID': docID,
+                    'msg': str(docID) + " is pending...",
+                    'icon': "AlertOctagonIcon",
+                    'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    'category': "success"
                 }
             }
         },
-        upsert=True)
+            upsert=True)
 
         if created != True:
             user_notify_collection.find_one_and_update({
                 'uname': document['created_by_user']
-            },{
-            '$push' : {
-                'notifications' : {
-                    'title': "New update in your document",
-                    'docID': docID,
-                    'msg': str(docID) + " recieved a new update.",
-                    'icon': "MailIcon",
-                    'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                    'category': "primary"
+            }, {
+                '$push': {
+                    'notifications': {
+                        'title': "New update in your document",
+                        'docID': docID,
+                        'msg': str(docID) + " recieved a new update.",
+                        'icon': "MailIcon",
+                        'time': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                        'category': "primary"
                     }
                 }
             },
-            upsert=True)
+                upsert=True)
         else:
             pass
 
@@ -126,6 +143,7 @@ def save_user_notify(
         print(e)
         return False
 
+
 def get_user_notifications(
     uname
 ):
@@ -133,20 +151,21 @@ def get_user_notifications(
         notifications = user_notify_collection.find({'uname': uname})
         notifications = list(notifications)
         notifications = notifications[0]['notifications']
-        # notifications = [{k: v for k, v in d.items() if k != '_id'} for d in notifications] 
-        notifications = sorted(notifications, key=lambda k: k['time'], reverse=True)
+        # notifications = [{k: v for k, v in d.items() if k != '_id'} for d in notifications]
+        notifications = sorted(
+            notifications, key=lambda k: k['time'], reverse=True)
         print(notifications)
         return notifications
     except Exception as e:
-        print(e) 
+        print(e)
         return False
-    
+
 
 def save_department(
-    depName, 
+    depName,
     depHOD,
     about
-    ):
+):
     try:
         department_collection.insert_one({
             "_id": depName,
@@ -157,6 +176,7 @@ def save_department(
         return True
     except Exception:
         return False
+
 
 def get_departments():
     try:
@@ -169,11 +189,12 @@ def get_departments():
     except Exception:
         return False
 
+
 def update_department(depName, depHOD, about):
     try:
         department_collection.find_one_and_update(
             {'_id': depName},
-            {'$set':{
+            {'$set': {
                 'depHOD': depHOD,
                 'about': about
             }
@@ -182,42 +203,59 @@ def update_department(depName, depHOD, about):
     except Exception:
         return False
 
-    
+
+def del_department(id):
+    try:
+        department_collection.delete_one({'_id': id})
+        return True
+        
+    except Exception:
+        return False
+
+
 def get_documents():
     documents = list(doc_collection.find())
     for i in documents:
-        i['date_created'] = json.dumps(i['date_created'], default = myconverter).split(" ")[0]
+        i['date_created'] = json.dumps(
+            i['date_created'], default=myconverter).split(" ")[0]
         i['_id'] = parse_json(i['_id'])
     return documents
+
 
 def get_user_created_document(uname):
     documents = list(doc_collection.find({
-        'created_by_uname' : uname,
+        'created_by_uname': uname,
         'isCompleted': False
     }))
     for i in documents:
-        i['date_created'] = json.dumps(i['date_created'], default = myconverter).split(" ")[0]
+        i['date_created'] = json.dumps(
+            i['date_created'], default=myconverter).split(" ")[0]
         i['_id'] = parse_json(i['_id'])
     return documents
+
 
 def get_user_completed_document(uname):
     documents = list(doc_collection.find({
-        'created_by_uname' : uname,
+        'created_by_uname': uname,
         'isCompleted': True
     }))
     for i in documents:
-        i['date_created'] = json.dumps(i['date_created'], default = myconverter).split(" ")[0]
+        i['date_created'] = json.dumps(
+            i['date_created'], default=myconverter).split(" ")[0]
         i['_id'] = parse_json(i['_id'])
     return documents
 
+
 def get_user_pending_document(uname):
     documents = list(doc_collection.find({
-        'target_user' : uname 
+        'target_user': uname
     }))
     for i in documents:
-        i['date_created'] = json.dumps(i['date_created'], default = myconverter).split(" ")[0]
+        i['date_created'] = json.dumps(
+            i['date_created'], default=myconverter).split(" ")[0]
         i['_id'] = parse_json(i['_id'])
     return documents
+
 
 def save_user_approved_documents(uname, docID):
     try:
@@ -228,10 +266,11 @@ def save_user_approved_documents(uname, docID):
                 'documents': docID
             }
         },
-        upsert=True)
+            upsert=True)
         return True
     except:
         return False
+
 
 def get_user_approved_document(uname):
     ids = doc_approval_collection.find({'uname': uname})
@@ -251,12 +290,12 @@ def save_document(
     targetUName,
     targetUDep,
     description
-    ):
+):
     try:
         resp = get_docID_sequence()
         resp = int(resp)
         doc_collection.insert_one({
-            '_id' : createdByDep + "-" + str(int(resp)),
+            '_id': createdByDep + "-" + str(int(resp)),
             'title': title,
             'created_by_user': createdByName,
             'created_by_uname': createdByUName,
@@ -267,7 +306,7 @@ def save_document(
             'target_department': targetUDep,
             'description': description,
             'date_created': datetime.now()
-            })
+        })
         inc_docID_sequence()
         save_user_notify(createdByDep + "-" + str(int(resp)), True)
         return True
@@ -276,13 +315,12 @@ def save_document(
         return False
 
 
-
 def update_completion(docID):
     try:
         doc_collection.find_one_and_update({
             '_id': docID
         },
-        {
+            {
             '$set': {
                 'isCompleted': True
             }
@@ -292,12 +330,13 @@ def update_completion(docID):
         print(e)
         return False
 
+
 def document_archived(docID):
     try:
         doc_collection.find_one_and_update({
             '_id': docID
         },
-        {
+            {
             '$set': {
                 'archived': True
             }
@@ -306,7 +345,7 @@ def document_archived(docID):
     except Exception as e:
         print(e)
         return False
-        
+
 
 def get_log(docID):
     try:
@@ -321,21 +360,22 @@ def get_log(docID):
         print(e)
         return False
 
+
 def save_log_sequence(
     docID
 ):
     try:
         sequence_collection.find_one_and_update({
             "docID": docID
-        },{
-            '$push':{
+        }, {
+            '$push': {
                 "sequence": [
                     "Recieved"
                 ]
             }
         },
-        return_document=True,
-        upsert=True)
+            return_document=True,
+            upsert=True)
         return True
     except:
         return False
@@ -345,15 +385,16 @@ def inc_docID_sequence():
     try:
         doc_sequence_collection.find_one_and_update({
             'collection': 'dep_seq'
-        },{
-            '$inc':{
+        }, {
+            '$inc': {
                 'id': 1
             }
         },
-        return_document=True)
+            return_document=True)
         return True
     except:
         return False
+
 
 def get_docID_sequence():
     try:
@@ -363,6 +404,7 @@ def get_docID_sequence():
         return seq['id']
     except:
         return False
+
 
 def get_log_sequence(docID):
     try:
@@ -375,6 +417,7 @@ def get_log_sequence(docID):
     except Exception:
         return False
 
+
 def save_log(
     docID,
     forwardedToUname,
@@ -384,7 +427,7 @@ def save_log(
     date
 ):
 
-    #create log db
+    # create log db
     try:
         log = get_log(docID)
         if log:
@@ -392,19 +435,19 @@ def save_log(
         log_collection.find_one_and_update({
             'docID': docID
         }, {
-                '$push':
+            '$push':
                 {
-                    'logList' : {
-                    'forwardedToUname': forwardedToUname,
-                    'forwardedDep': forwardedDep,
-                    'objection': objection,
-                    'comments': comments,
-                    'date': date,
+                    'logList': {
+                        'forwardedToUname': forwardedToUname,
+                        'forwardedDep': forwardedDep,
+                        'objection': objection,
+                        'comments': comments,
+                        'date': date,
                     }
                 },
-            },
-        return_document=True,
-        upsert=True
+        },
+            return_document=True,
+            upsert=True
         )
 
         doc_collection.find_one_and_update({
@@ -418,6 +461,7 @@ def save_log(
     except Exception as e:
         print(e)
         return False
-    
+
+
 if __name__ == "__main__":
     get_user_notifications('Hamza9211')
