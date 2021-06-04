@@ -5,8 +5,10 @@ from flask_restful import Resource, Api
 from flask_cors import CORS
 import datetime
 import jwt
+import json
+from bson import json_util
 from functools import wraps
-from db import get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, del_department, save_department, update_department, get_log_sequence, get_user_created_document, get_user_pending_document, get_users, del_user, update_completion, get_user_completed_document, save_user_approved_documents, save_user_notify, get_user_notifications
+from db import get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, del_department, save_department, update_department, get_log_sequence, get_user_created_document, get_user_pending_document, get_users, del_user, update_completion, get_user_completed_document, save_user_approved_documents, save_user_notify, get_user_notifications, archive_document
 
 
 app = Flask(__name__)
@@ -59,11 +61,12 @@ class Login(Resource):
             token = jwt.encode({
                 'username': user['_id'],
                 'fullName': user['name'],
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)},
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
+                },
                 app.config['SECRET_KEY']
             )
             isAdmin = True if user['role'] == 'Super Admin' else False
-            return {'token': token, 'isAdmin': isAdmin}
+            return {'token': token.decode('utf-8'), 'isAdmin': isAdmin}, 200
 
         return make_response(
             'Could not verify',
@@ -87,7 +90,7 @@ class User(Resource):
 
     def post(self, username):
         json_data = request.get_json(force=True)
-        uName = json_data['un']
+        uName = json_data['_id']
         name = json_data['name']
         email = json_data['email']
         password = json_data['password']
@@ -146,6 +149,17 @@ class User(Resource):
 
         except Exception as e:
             return {'msg': 'Server error, try again later'}, 500
+
+class ArchiveDocument(Resource):
+    def put(self):
+        json_data = request.get_json(force=True)
+        docID = json_data['_id']
+        print(docID)
+        resp = archive_document(docID)
+        if resp:
+            return {'msg': "Document Succesfully archived"}, 200
+        else:
+            return {'msg': "Internal Server Error"}
 
 
 class UserNotifications(Resource):
@@ -328,6 +342,7 @@ api.add_resource(Login, '/api/login')
 api.add_resource(User, '/api/user/<username>')
 api.add_resource(UserNotifications, '/api/usernotify/<uname>')
 api.add_resource(Documents, '/api/documents')
+api.add_resource(ArchiveDocument, '/api/archivedocuments')
 api.add_resource(UpdateDocuments, '/api/updatedocuments')
 api.add_resource(UserDocuments, '/api/userdocuments/<uname>')
 api.add_resource(UserDocumentsCompleted, '/api/usercompleteddocuments/<uname>')

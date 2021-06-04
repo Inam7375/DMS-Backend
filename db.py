@@ -154,7 +154,6 @@ def get_user_notifications(
         # notifications = [{k: v for k, v in d.items() if k != '_id'} for d in notifications]
         notifications = sorted(
             notifications, key=lambda k: k['time'], reverse=True)
-        print(notifications)
         return notifications
     except Exception as e:
         print(e)
@@ -212,6 +211,18 @@ def del_department(id):
     except Exception:
         return False
 
+def archive_document(id):
+    try:
+        doc_collection.find_one_and_update(
+            {'_id': id},
+            {'$set': {
+                'archived' : True
+            }}
+        )
+        return True
+    except:
+        return False
+
 
 def get_documents():
     documents = list(doc_collection.find())
@@ -237,7 +248,8 @@ def get_user_created_document(uname):
 def get_user_completed_document(uname):
     documents = list(doc_collection.find({
         'created_by_uname': uname,
-        'isCompleted': True
+        'isCompleted': True,
+        'archived': False
     }))
     for i in documents:
         i['date_created'] = json.dumps(
