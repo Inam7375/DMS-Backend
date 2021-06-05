@@ -6,7 +6,7 @@ from flask_cors import CORS
 import datetime
 import jwt
 from functools import wraps
-from db import get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, del_department, save_department, update_department, get_log_sequence, get_user_created_document, get_user_pending_document, get_users, del_user, update_completion, get_user_completed_document, save_user_approved_documents, save_user_notify, get_user_notifications
+from db import get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, del_department, save_department, update_department, get_log_sequence, get_user_created_document, get_user_pending_document, get_users, update_completion, get_user_completed_document, save_user_approved_documents, save_user_notify, get_user_notifications
 
 
 app = Flask(__name__)
@@ -132,20 +132,6 @@ class User(Resource):
                 return {'msg': 'Server error, try again later'}, 500
         except Exception as e:
             print(e)
-
-    def delete(self, username):
-        try:
-            user = get_user(username)
-            if not user:
-                return {'msg': "User Not Exists"}, 203
-            res = del_user(username)
-            if res:
-                return {'msg': 'User Succesfully Deleted'}, 201
-            else:
-                return {'msg': 'User Cannot be Deleted'}, 203
-
-        except Exception as e:
-            return {'msg': 'Server error, try again later'}, 500
 
 
 class UserNotifications(Resource):
