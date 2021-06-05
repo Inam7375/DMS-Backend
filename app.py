@@ -81,9 +81,9 @@ class User(Resource):
     def get(self, username):
         user = get_user(username)
         if user:
-            return user, 200
+            return user, 201
         else:
-            return {'msg': 'User not found'}, 404
+            return {'msg': 'User not found'}, 203
 
     def post(self, username):
         json_data = request.get_json(force=True)
@@ -102,9 +102,9 @@ class User(Resource):
             resp = save_user(uName, name, email, password,
                              department, designation, role)
             if resp:
-                return {'msg': "User Created"}, 201
+                return {'msg': "User Succesfully Created"}, 201
             else:
-                return {'msg': 'User can not be created'}, 422
+                return {'msg': 'User can not be created'}, 203
         except Exception:
             return {'msg': 'Server Error'}, 500
 
@@ -112,10 +112,10 @@ class User(Resource):
         # Validating the user
         user = get_user(username)
         if not user:
-            return {"msg": "User does not exist"}, 404
+            return {"msg": "User does not Exists"}, 203
 
         json_data = request.get_json(force=True)
-        uName = json_data['username']
+        # uName = json_data['un']
         name = json_data['name']
         email = json_data['email']
         password = json_data['password']
@@ -124,10 +124,10 @@ class User(Resource):
         role = json_data['role']
 
         try:
-            resp = update_user(uName, name, email, password,
+            resp = update_user(username, name, email, password,
                                department, designation, role)
             if resp:
-                return {'msg': "User Updated"}, 201
+                return {'msg': "User Succesfully Updated"}, 201
             else:
                 return {'msg': 'Server error, try again later'}, 500
         except Exception as e:
@@ -177,7 +177,7 @@ class Departments(Resource):
             departmentsList = get_departments()
             if departmentsList:
                 return {'results': departmentsList}, 200
-            return {'msg': 'Departments Not Found'}, 405
+            return {'msg': 'Departments Not Found'}, 203
         except Exception:
             return {'msg': "Server error"}, 500
 
@@ -189,11 +189,11 @@ class Departments(Resource):
         try:
             resp = save_department(depName, depHOD, about)
             if resp:
-                return {"msg": "Department succesfully saved"}
+                return {"msg": "Department succesfully Added"}, 201
             else:
-                return {"msg": "Department could not be saved"}
+                return {"msg": "Department Already Exists"}, 203
         except Exception:
-            return {"msg": "Error in saving deparment"}
+            return {"msg": "Error in saving deparment"}, 500
 
     def put(self):
         json_data = request.get_json(force=True)
@@ -203,11 +203,11 @@ class Departments(Resource):
         try:
             resp = update_department(depName, depHOD, about)
             if resp:
-                return {"msg": "Department succesfully updated"}
+                return {"msg": "Department succesfully updated"}, 201
             else:
-                return {"msg": "Department could not be updated"}
+                return {"msg": "Department Already Exists"}, 203
         except Exception:
-            return {"msg": "Error in updating department"}
+            return {"msg": "Error in updating department"}, 500
 
 
 class Department(Resource):
@@ -215,9 +215,9 @@ class Department(Resource):
         try:
             res = del_department(id)
             if res:
-                return {'msg': 'Department Succesfully  Deleted'}, 200
+                return {'msg': 'Department Succesfully  Deleted'}, 201
             else:
-                return {'msg': 'Department cannot be Deleted'}, 401
+                return {'msg': 'Department cannot be Deleted'}, 203
         except Exception as e:
             return {'msg': 'Server error, try again later'}, 500
 
