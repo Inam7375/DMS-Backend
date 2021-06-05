@@ -62,11 +62,11 @@ class Login(Resource):
                 'username': user['_id'],
                 'fullName': user['name'],
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
-                },
+            },
                 app.config['SECRET_KEY']
             )
             isAdmin = True if user['role'] == 'Super Admin' else False
-            return {'token': token.decode('utf-8'), 'isAdmin': isAdmin}, 200
+            return {'token': token, 'isAdmin': isAdmin}, 200
 
         return make_response(
             'Could not verify',
@@ -148,6 +148,7 @@ class ArchiveDocument(Resource):
         else:
             return {'msg': "Internal Server Error"}
 
+
 class UserNotifications(Resource):
     def get(self, uname):
         notifications = get_user_notifications(uname)
@@ -163,7 +164,7 @@ class UserNotifications(Resource):
             created = False
             resp = save_user_notify(docID, created)
             if resp:
-                return {'msg': "Document succesfully saved"}, 200
+                return {'msg': "Document successfully saved"}, 200
             else:
                 return {'msg': "Document was unable to save"}, 500
         except Exception as e:
@@ -203,7 +204,7 @@ class Departments(Resource):
         try:
             resp = update_department(depName, depHOD, about)
             if resp:
-                return {"msg": "Department succesfully updated"}, 201
+                return {"msg": "Department successfully updated"}, 201
             else:
                 return {"msg": "Department Already Exists"}, 203
         except Exception:
@@ -215,7 +216,7 @@ class Department(Resource):
         try:
             res = del_department(id)
             if res:
-                return {'msg': 'Department Succesfully  Deleted'}, 201
+                return {'msg': 'Department Successfully  Deleted'}, 201
             else:
                 return {'msg': 'Department cannot be Deleted'}, 203
         except Exception as e:
@@ -240,7 +241,7 @@ class UserDocumentsApproved(Resource):
         docID = json_data['docID']
         resp = save_user_approved_documents(uname, docID)
         if resp:
-            return {'msg': 'Approved document saved'}, 200
+            return {'msg': 'Approved document saved'}, 201
         else:
             return {'msg': 'Internal server error'}
 
@@ -257,7 +258,7 @@ class UpdateDocuments(Resource):
         docID = json_data['docID']
         resp = update_completion(docID)
         if resp:
-            return {'msg': 'Document Completed'}, 200
+            return {'msg': 'Document Completed Successfully'}, 201
         else:
             return {'msg': 'Inter Server Error'}, 500
 
@@ -280,9 +281,9 @@ class Documents(Resource):
             resp = save_document(title, frmUser, frmUname,
                                  frmDep, targetUser, targetDep, dsc)
             if resp:
-                return {'msg': 'Document Saved'}, 200
+                return {'msg': 'Document Saved Successfully'}, 201
             else:
-                return {'msg': 'Server Error'}, 500
+                return {'msg': ' Could not be saved'}, 203
         except Exception:
             return {'msg': 'Server Error'}, 500
 
@@ -316,9 +317,9 @@ class Logs(Resource):
             log = save_log(docID, forwardedToUname,
                            forwardedDep, objection, comments, date)
             if log:
-                return {"msg": "Log Updated"}, 200
+                return {"msg": "Log Updated Successfully"}, 201
             else:
-                return {"msg": "Server Error"}, 500
+                return {"msg": "Cannot be updated"}, 203
         except Exception:
             return {"msg": "Server Error"}, 500
 
