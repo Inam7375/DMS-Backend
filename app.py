@@ -1,4 +1,6 @@
 import json
+import re
+from pymongo.message import update
 from werkzeug.security import check_password_hash
 from flask import Flask, request, make_response
 from flask_restful import Resource, Api
@@ -8,7 +10,7 @@ import jwt
 import json
 from bson import json_util
 from functools import wraps
-from db import get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, del_department, save_department, update_department, get_log_sequence, get_user_created_document, get_user_pending_document, get_users, del_user, update_completion, get_user_completed_document, save_user_approved_documents, save_user_notify, get_user_notifications, archive_document
+from db import get_documents, save_user, get_user, update_user, save_document, save_log, get_log, get_departments, del_department, save_department, update_department, get_log_sequence, get_user_created_document, get_user_pending_document, get_users, del_user, update_completion, get_user_completed_document, save_user_approved_documents, save_user_notify, get_user_notifications, archive_document, update_user_status
 
 
 app = Flask(__name__)
@@ -61,6 +63,7 @@ class Login(Resource):
             token = jwt.encode({
                 'username': user['_id'],
                 'fullName': user['name'],
+                'department': user['department'],
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
                 },
                 app.config['SECRET_KEY']
@@ -78,6 +81,16 @@ class Users(Resource):
     def get(self):
         users = get_users()
         return {'results': users}
+
+class UpdateUser(Resource):
+    def put(self):
+        json_data = request.get_json(force=True)
+        uname = json_data["_id"]
+        resp = update_user_status(uname)
+        if resp:
+            return {"msg": "User Status Changed Succesfully"}, 201
+        else:
+            return {"msg": "Internal Server Error"}, 500
 
 
 class User(Resource):
@@ -340,6 +353,7 @@ class Logs(Resource):
 api.add_resource(Users, '/api/users')
 api.add_resource(Login, '/api/login')
 api.add_resource(User, '/api/user/<username>')
+api.add_resource(UpdateUser, '/api/updateuser')
 api.add_resource(UserNotifications, '/api/usernotify/<uname>')
 api.add_resource(Documents, '/api/documents')
 api.add_resource(ArchiveDocument, '/api/archivedocuments')
