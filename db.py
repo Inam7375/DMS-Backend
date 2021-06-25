@@ -54,6 +54,7 @@ def save_user(uname, name, email, password, dpt, desig, role):
     try:
         user_collection.insert_one({
             '_id': uname,
+            'status': True,
             'name': name,
             'email': email,
             'password': hash_pass,
@@ -86,6 +87,23 @@ def update_user(uname, name, email, password, dpt, desig, role):
     except Exception as e:
         print(e)
         return False
+
+def update_user_status(uname):
+        user = user_collection.find_one({'_id' : uname})
+        if user:
+            status = not user['status']
+            try:
+                user_collection.find_one_and_update({
+                    '_id': uname
+                    },{
+                        '$set': {
+                            'status': status
+                        }
+                    })
+                return True
+            except:
+                return False
+
 
 
 def save_user_notify(
@@ -467,4 +485,4 @@ def save_log(
 
 
 if __name__ == "__main__":
-    get_user_notifications('Hamza9211')
+    update_user_status('inam122')
