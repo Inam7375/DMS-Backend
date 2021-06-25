@@ -106,15 +106,6 @@ def update_user_status(uname):
 
 
 
-def del_user(uname):
-    try:
-        user_collection.delete_one({'_id': uname})
-        return True
-
-    except Exception:
-        return False
-
-
 def save_user_notify(
     docID,
     created=False,
@@ -225,7 +216,7 @@ def del_department(id):
     try:
         department_collection.delete_one({'_id': id})
         return True
-        
+
     except Exception:
         return False
 
