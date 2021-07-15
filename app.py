@@ -60,12 +60,18 @@ class Login(Resource):
                 'User Not Found',
                 401,
                 {'WWW-Authenticate': 'Basic realm="Login required!"'})
+        if not user['status']:
+            return make_response(
+                'User Not Found',
+                401,
+                {'WWW-Authenticate': 'Basic realm="Login required!"'})
 
         if check_password_hash(user['password'], password):
             token = jwt.encode({
                 'username': user['_id'],
                 'fullName': user['name'],
                 'department': user['department'],
+                'role':user['role'],
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
             },
                 app.config['SECRET_KEY']
